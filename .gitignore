@@ -1,0 +1,19 @@
+# Window
+
+# Mac
+.DS_Store
+*/.DS_Store
+
+# Linux
+*/.directory
+
+# CMake
+build
+cmake-build-debug
+
+# CLion
+.idea
+
+# Visual Studio
+.vs
+out

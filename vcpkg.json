@@ -1,0 +1,7 @@
+{
+  "name" : "lagrange",
+  "version-string" : "0.0.1",
+  "description": "A modern cpp library project to implement oicq protocol. From Lagrange.Core.",
+  "license": "MPL-2.0",
+  "dependencies" : [ "stdexec", "boost-asio", "boost-pfr", "reflectcpp", "yalantinglibs" ]
+}

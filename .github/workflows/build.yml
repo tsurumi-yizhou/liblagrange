@@ -1,0 +1,77 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-with-msvc:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v3
+      - uses: johnwason/vcpkg-action@v6
+        with:
+          manifest-dir: ${{ github.workspace }}
+          triplet: x64-windows-release
+          cache-key: x64-windows-release
+          token: ${{ github.token }}
+          github-binarycache: true
+
+      - uses: threeal/cmake-action@v2.1.0
+        with:
+          generator: Visual Studio 17 2022
+          c-compiler: cl
+          cxx-compiler: cl
+          options: CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+  build-with-gcc:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ashutoshvarma/setup-ninja@v1.1
+        with:
+          version: '1.12.1'
+          platform: 'linux'
+
+      - uses: johnwason/vcpkg-action@v6
+        with:
+          manifest-dir: ${{ github.workspace }}
+          triplet: x64-linux-release
+          cache-key: x64-linux-release
+          token: ${{ github.token }}
+          github-binarycache: true
+
+      - uses: threeal/cmake-action@v2.1.0
+        with:
+          generator: Ninja
+          c-compiler: gcc-14
+          cxx-compiler: g++-14
+          options: CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+  build-with-clang:
+    runs-on: macos-15
+    env:
+      LDFLAGS: -L/opt/homebrew/opt/llvm@18/lib/c++ -L/opt/homebrew/opt/llvm@18/lib -lunwind
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ashutoshvarma/setup-ninja@v1.1
+        with:
+          version: '1.12.1'
+          platform: 'mac'
+
+      - uses: johnwason/vcpkg-action@v6
+        with:
+          manifest-dir: ${{ github.workspace }}
+          triplet: arm64-osx-release
+          cache-key: arm64-osx-release
+          token: ${{ github.token }}
+          github-binarycache: true
+
+      - uses: threeal/cmake-action@v2.1.0
+        with:
+          generator: Ninja
+          c-compiler: /opt/homebrew/opt/llvm@18/bin/clang
+          cxx-compiler: /opt/homebrew/opt/llvm@18/bin/clang++
+          options: CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
