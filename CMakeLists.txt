@@ -14,4 +14,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE STDEXEC::stdexec)
 find_package(Boost REQUIRED COMPONENTS asio pfr)
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::asio Boost::pfr)
 
+find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
+
 add_subdirectory(test)

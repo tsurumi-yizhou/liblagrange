@@ -3,7 +3,7 @@
 //
 module;
 
-#include <asio/awaitable.hpp>
+#include <boost/asio/awaitable.hpp>
 
 export module asynchrony;
 
@@ -11,7 +11,7 @@ import standard;
 
 namespace async {
 
-using asio::awaitable;
+using boost::asio::awaitable;
 
 export template<typename T, typename Functor>
 struct callback_awaitable {

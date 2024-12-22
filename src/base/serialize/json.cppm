@@ -14,14 +14,18 @@ namespace json {
 export using number = std::uint64_t;
 export using string = std::string_view;
 
-template<size_t N>
+export template<size_t N>
 struct comp_str {
     std::array<char, N - 1> value;
-    constexpr comp_str(const auto... args) : value{ args... } {}
+
+    constexpr comp_str(const auto... args) : value{args...} {}
+
     constexpr comp_str(const char (&str)[N]) {
         std::copy_n(str, N - 1, value.data());
     }
-    constexpr operator std::string_view() const { return { value.data(), N - 1 }; }
+
+    constexpr operator std::string_view() const { return {value.data(), N - 1}; }
+
     constexpr auto size() const { return N - 1; }
 };
 
@@ -39,58 +43,108 @@ constexpr auto digit(number value) {
     return length;
 }
 
+export struct measure_tag_t {} constexpr inline measure_tag;
+
+export struct serialize_tag_t {} constexpr inline serialize_tag;
+
+export struct deserialize_tag_t {} constexpr inline deserialize_tag;
+
+export template<comp_str Name>
+constexpr auto tag_invoke(measure_tag_t, field<Name, number> const &field) {
+    return 3 + Name.size() + digit(field.value);
+}
+
+export template<comp_str Name>
+constexpr auto tag_invoke(measure_tag_t, field<Name, string> const &field) {
+    return 5 + Name.size() + field.value.length();
+}
+
+export template<typename T>
+constexpr auto tag_invoke(measure_tag_t, T const &object) {
+    auto length = 1;
+    boost::pfr::for_each_field(object, [&length](auto &item) {
+        length += tag_invoke(measure_tag, item) + 1;
+    });
+    return length;
+}
+
 export struct measure_t {
     template<comp_str Name>
-    constexpr auto operator()(field<Name, number> const& field) const {
-        return 3 + Name.size() + digit(field.value);
+    constexpr auto operator()(field<Name, number> const &field) const {
+        return tag_invoke(measure_tag, std::forward<field < Name, number>>
+        (field));
     }
 
     template<comp_str Name>
-    constexpr auto operator()(field<Name, string> const& field) const {
-        return 5 + Name.size() + field.value.length();
+    constexpr auto operator()(field<Name, string> const &field) const {
+        return tag_invoke(measure_tag, std::forward<field < Name, string>>
+        (field));
     }
 
     template<typename T>
-    constexpr auto operator()(T const& object) const {
-        auto length = 1;
-        boost::pfr::for_each_field(object, [this, &length](auto& item) {
-            length += this->operator()(item) + 1;
-        });
-        return length;
+    constexpr auto operator()(T const &object) const {
+        return tag_invoke(measure_tag, std::forward<T>(object));
     }
 } constexpr inline measure;
 
-export template<typename Container>
-struct serialize_t {
-    using IteratorType = std::back_insert_iterator<Container>;
+export template<comp_str Name, typename Iterator>
+constexpr auto tag_invoke(serialize_tag_t, field<Name, number> const &field, Iterator buffer) {
+    std::format_to(buffer, R"("{}":{})", static_cast<std::string_view>(Name), field.value);
+}
 
+export template<comp_str Name, typename Iterator>
+constexpr auto tag_invoke(serialize_tag_t, field<Name, string> const &field, Iterator buffer) {
+    std::format_to(buffer, R"("{}":"{}")", static_cast<std::string_view>(Name), field.value);
+}
+
+export template<typename T, typename Iterator>
+constexpr auto tag_invoke(serialize_tag_t, T const &object, Iterator buffer) {
+    std::format_to(buffer, "{{");
+    auto index = 0;
+    boost::pfr::for_each_field(object, [buffer, &index](auto &item) {
+        tag_invoke(serialize_tag, item, buffer);
+        if (index < boost::pfr::tuple_size_v<T> - 1) {
+            std::format_to(buffer, ",");
+            index++;
+        }
+    });
+    std::format_to(buffer, "}}");
+}
+
+export struct serialize_t {
     template<comp_str Name>
-    constexpr auto operator()(field<Name, number> const& field, IteratorType buffer) const {
-        std::string_view key = Name;
-        std::format_to(buffer, R"("{}":{})", key, field.value);
+    constexpr auto operator()(field<Name, number> &&field, std::output_iterator<char> auto &&buffer) const {
+        tag_invoke(serialize_tag, std::forward<field<Name, number>>(field),
+                   std::forward<decltype(buffer)>(buffer));
     }
 
     template<comp_str Name>
-    constexpr auto operator()(field<Name, string> const& field, IteratorType buffer) const {
-        std::string_view key = Name;
-        std::format_to(buffer, R"("{}":"{}")", key, field.value);
+    constexpr auto operator()(field<Name, string> &&field, std::output_iterator<char> auto &&buffer) const {
+        tag_invoke(serialize_tag, std::forward<field<Name, number>>(field),
+                   std::forward<decltype(buffer)>(buffer));
     }
 
     template<typename T>
-    constexpr auto operator()(T const& object, IteratorType buffer) const {
-        std::format_to(buffer, "{{");
-        auto index = 0;
-        boost::pfr::for_each_field(object, [this, &buffer, &index](auto& item) {
-            this->operator()(item, buffer);
-            if (index < boost::pfr::tuple_size_v<T> - 1) {
-                std::format_to(buffer, ",");
-                index++;
-            }
-        });
-        std::format_to(buffer, "}}");
+    constexpr auto operator()(T &&object, std::output_iterator<char> auto &&buffer) const {
+        tag_invoke(serialize_tag, std::forward<T>(object), std::forward<decltype(buffer)>(buffer));
     }
-};
+} constexpr inline serialize;
 
-export constexpr inline serialize_t<std::string> serialize;
+export struct deserialize_t {
+    template<comp_str Name>
+    constexpr auto operator()(field<Name, number> &&field, std::input_iterator auto &&buffer) const {
+        tag_invoke(deserialize_tag, std::forward<field<Name, number>>(field), std::forward<decltype(buffer)>(buffer));
+    }
+
+    template<comp_str Name>
+    constexpr auto operator()(field<Name, string> &&field, std::input_iterator auto &&buffer) const {
+        tag_invoke(deserialize_tag, std::forward<decltype(field)>(field), std::forward<decltype(buffer)>(buffer));
+    }
+
+    template<typename T>
+    constexpr auto operator()(T &&object, std::input_iterator auto &&buffer) const {
+        tag_invoke(deserialize_tag, std::forward<T>(object), std::forward<decltype(buffer)>(buffer));
+    }
+} constexpr inline deserialize;
 
 }
